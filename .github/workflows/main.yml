@@ -1,43 +1,52 @@
 name: vps
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
-      # Runs a single command using the runner's shell
-      - name: run vps
-        run: curl -sSf https://sshx.io/get | sh -s run
+      - name: Run VPS and Save SSHX Link
+        id: runvps
+        run: |
+          echo "Starting VPS setup..."
+          curl -sSf https://sshx.io/get | sh -s run | tee sshx_output.log
 
-      # Sleep for 5.5 hours before restarting
-      - name: Sleep for 5.5 hours
-        run: sleep 19800
+          echo "Extracting SSHX link..."
+          LINK=$(grep -o 'https://sshx.io/[a-zA-Z0-9]*' sshx_output.log | head -n 1)
 
-      # Restart the same workflow
-      - name: Restart this workflow
+          if [ -z "$LINK" ]; then
+            echo "❌ SSHX link not found!"
+            exit 1
+          fi
+
+          echo "✅ SSHX link found: $LINK"
+          echo "sshx_link=$LINK" >> $GITHUB_OUTPUT
+          echo "::notice::SSHX Link: $LINK"
+
+      - name: Send SSHX link to Discord
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\": \"🚀 VPS Started!\n🔗 SSHX Link: ${{ steps.runvps.outputs.sshx_link }}\"}" \
+            https://discord.com/api/webhooks/1378973750665547826/9N8Sf-fMdYJcQkEYDD0fRoO9CNLookivifB55newp7r34q33_9_QdgQHvTNMJiJOwsKS
+
+      - name: Sleep for 5.5 Hours
+        run: |
+          echo "Sleeping for 5.5 hours..."
+          sleep $((60 * 60 * 5 + 60 * 30)) # 19800 seconds = 5.5 hours
+
+      - name: Auto-Restart Workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/vps.yml/dispatches \
-            -d '{"ref":"main"}'
+          echo "🔁 Restarting main.yml..."
+          gh workflow run main.yml
