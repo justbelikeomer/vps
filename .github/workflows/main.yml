@@ -27,29 +27,17 @@ jobs:
       - name: run vps
         run: curl -sSf https://sshx.io/get | sh -s run
 
-      - name: Save SSHX Link
-        run: |
-          grep -o 'https://sshx.io/s/.*' sshx.txt | head -n1 > link.txt
+      # Sleep for 5.5 hours before restarting
+      - name: Sleep for 5.5 hours
+        run: sleep 19800
 
-      - name: Sleep for 5.5 Hours
-        run: sleep $((60 * 60 * 5 + 60 * 30))
-
-      - name: Send Link to Discord
-        env:
-          DISCORD_WEBHOOK: https://discord.com/api/webhooks/1378973750665547826/9N8Sf-fMdYJcQkEYDD0fRoO9CNLookivifB55newp7r34q33_9_QdgQHvTNMJiJOwsKS
-        run: |
-          link=$(cat link.txt)
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "{\"content\": \"🔗 **New SSHX VPS is live!**\n$link\"}" \
-               "$DISCORD_WEBHOOK"
-
-      - name: Auto-Restart Workflow
+      # Restart the same workflow
+      - name: Restart this workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/vps.yml/dispatches \
             -d '{"ref":"main"}'
